@@ -1,0 +1,463 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Cyber Face Vibe & Aura Scanner</title>
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;800;900&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <!-- Face Detection API Library -->
+  <script src="https://cdn.jsdelivr.net/npm/@vladmandic/face-api/dist/face-api.js"></script>
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Outfit', 'sans-serif'],
+            radar: ['Orbitron', 'sans-serif'],
+          },
+          colors: {
+            neonPink: '#ff007f',
+            neonPurple: '#a855f7',
+            neonCyan: '#00f0ff',
+            neonGreen: '#10b981',
+            neonGold: '#f59e0b',
+            darkBg: '#050814',
+          },
+          boxShadow: {
+            'neon-pink': '0 0 25px rgba(255, 0, 127, 0.6)',
+            'neon-cyan': '0 0 25px rgba(0, 240, 255, 0.6)',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    body {
+      background-color: #050814;
+      background-image: 
+        radial-gradient(at 20% 20%, rgba(255, 0, 127, 0.12) 0px, transparent 50%),
+        radial-gradient(at 80% 80%, rgba(0, 240, 255, 0.12) 0px, transparent 50%);
+      background-attachment: fixed;
+    }
+
+    .glass-panel {
+      background: rgba(12, 17, 38, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+
+    /* Laser Line Animation */
+    @keyframes laserSweep {
+      0% { top: 0%; opacity: 0.8; }
+      50% { top: 95%; opacity: 1; }
+      100% { top: 0%; opacity: 0.8; }
+    }
+
+    .laser-line {
+      animation: laserSweep 2s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="text-slate-100 min-h-screen flex flex-col justify-between font-sans selection:bg-neonPink selection:text-white">
+
+  <!-- Header -->
+  <header class="pt-6 pb-2 px-4 text-center">
+    <div class="inline-flex items-center gap-2 px-4 py-1 rounded-full glass-panel text-xs font-radar font-semibold tracking-wider text-neonCyan border border-neonCyan/30 mb-2">
+      <span class="w-2.5 h-2.5 rounded-full bg-neonPink animate-ping"></span>
+      FACIAL VISION AI v2.0 • REAL-TIME SCANNER
+    </div>
+    <h1 class="text-3xl sm:text-5xl font-black font-radar tracking-wider text-transparent bg-clip-text bg-gradient-to-r from-neonPink via-neonPurple to-neonCyan drop-shadow-md">
+      CYBER FACE VIBE SCANNER
+    </h1>
+    <p class="text-slate-400 text-xs sm:text-sm mt-1 max-w-lg mx-auto">
+      Detect facial features in real time and analyze aura frequency, main character energy, and party vibes!
+    </p>
+  </header>
+
+  <!-- Main Scanner Screen -->
+  <main class="max-w-4xl w-full mx-auto px-4 py-4 flex flex-col items-center gap-6">
+    
+    <!-- Camera Frame Container -->
+    <div class="relative w-full max-w-[560px] aspect-[4/3] rounded-3xl glass-panel border-2 border-neonCyan/40 p-2 shadow-neon-cyan overflow-hidden flex items-center justify-center bg-black/80">
+      
+      <!-- Video Element -->
+      <video id="webcam" autoplay playsinline muted class="w-full h-full object-cover rounded-2xl transform -scale-x-100"></video>
+
+      <!-- Overlay Canvas for Drawing Reticles -->
+      <canvas id="overlayCanvas" class="absolute inset-0 w-full h-full pointer-events-none transform -scale-x-100 z-10"></canvas>
+
+      <!-- Laser Sweep Effect (Active when scanning) -->
+      <div id="laserLine" class="hidden absolute left-0 right-0 h-1 bg-gradient-to-r from-transparent via-neonPink to-transparent shadow-neon-pink z-20 laser-line"></div>
+
+      <!-- Initial Start Prompt -->
+      <div id="startPrompt" class="absolute inset-0 z-30 flex flex-col items-center justify-center p-6 bg-black/75 backdrop-blur-sm text-center">
+        <i class="fa-solid fa-camera-rotate text-5xl text-neonCyan mb-4 animate-bounce"></i>
+        <h2 class="text-2xl font-radar font-bold text-white mb-2">CAMERA REQUIRED</h2>
+        <p class="text-slate-300 text-xs max-w-xs mb-6">
+          Enable your camera to lock onto your face, track landmarks, and calculate your aura metrics.
+        </p>
+        <button onclick="startScanner()" class="px-6 py-3.5 rounded-2xl bg-gradient-to-r from-neonPink via-neonPurple to-neonCyan font-radar font-extrabold text-xs sm:text-sm tracking-wider text-white hover:opacity-95 shadow-neon-pink transition-all">
+          <i class="fa-solid fa-power-off mr-2"></i> START CAMERA SCANNER
+        </button>
+      </div>
+
+      <!-- Loading State -->
+      <div id="loadingBox" class="hidden absolute inset-0 z-30 flex flex-col items-center justify-center bg-black/80 text-center p-6">
+        <div class="w-12 h-12 border-4 border-neonCyan border-t-transparent rounded-full animate-spin mb-4"></div>
+        <p id="loadingText" class="font-radar text-sm text-neonCyan tracking-wider">LOADING FACE-API MODELS...</p>
+      </div>
+
+      <!-- Status Badge Overlay -->
+      <div class="absolute top-4 left-4 z-20 flex items-center gap-2 bg-black/60 px-3 py-1.5 rounded-full border border-white/10 text-[10px] font-radar">
+        <span id="statusDot" class="w-2 h-2 rounded-full bg-slate-500"></span>
+        <span id="statusText" class="text-slate-300">SYSTEM IDLE</span>
+      </div>
+
+    </div>
+
+    <!-- Scanner Action Controls -->
+    <div class="flex flex-wrap justify-center items-center gap-3 w-full max-w-[560px]">
+      <button id="scanBtn" onclick="triggerFullScan()" disabled class="flex-1 py-3.5 px-6 rounded-2xl bg-gradient-to-r from-neonPink to-neonCyan opacity-50 cursor-not-allowed font-radar font-bold text-xs tracking-wider text-white shadow-lg transition-all flex items-center justify-center gap-2">
+        <i class="fa-solid fa-bolt"></i> ANALYZE FACIAL VIBE
+      </button>
+      <button onclick="toggleAudio()" class="py-3.5 px-4 rounded-2xl glass-panel hover:border-neonPink text-xs font-radar text-slate-300 flex items-center justify-center gap-2 transition-all">
+        <i id="audioIcon" class="fa-solid fa-volume-xmark text-neonPink"></i> Sound
+      </button>
+    </div>
+
+  </main>
+
+  <!-- RESULT MODAL -->
+  <div id="resultModal" class="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 opacity-0 pointer-events-none transition-all duration-300">
+    <div class="glass-panel max-w-md w-full rounded-3xl p-6 border-2 border-neonPink shadow-neon-pink relative transform scale-95 transition-all duration-300" id="modalContainer">
+      
+      <!-- Close Button -->
+      <button onclick="closeModal()" class="absolute top-4 right-4 w-8 h-8 rounded-full bg-white/10 hover:bg-white/20 text-slate-300 flex items-center justify-center transition-all">
+        <i class="fa-solid fa-xmark"></i>
+      </button>
+
+      <!-- Badge Header -->
+      <div class="text-center">
+        <span id="auraBadge" class="inline-block px-3 py-1 rounded-full text-[10px] font-radar font-bold uppercase tracking-widest bg-neonPink/20 text-neonPink border border-neonPink/40 mb-3">
+          VERIFIED AURA ID
+        </span>
+        <h3 id="modalTitle" class="text-2xl font-black font-radar text-white">MAIN CHARACTER ENERGY</h3>
+        
+        <!-- Score Circle -->
+        <div class="my-4 inline-flex items-baseline justify-center gap-1">
+          <span id="modalScore" class="text-6xl font-black font-radar text-transparent bg-clip-text bg-gradient-to-br from-white via-neonCyan to-neonPink">98</span>
+          <span class="text-2xl font-bold text-neonPink">%</span>
+        </div>
+        <p id="modalCategory" class="text-neonCyan font-radar font-bold text-xs uppercase tracking-wide"></p>
+        <p id="modalDesc" class="text-slate-300 italic text-xs mt-2 px-2"></p>
+      </div>
+
+      <!-- Trait Breakdown Bars -->
+      <div class="space-y-3 mt-6 pt-4 border-t border-white/10">
+        <h4 class="text-[11px] font-radar font-bold uppercase tracking-widest text-slate-400">Facial Aura Analysis</h4>
+        
+        <div>
+          <div class="flex justify-between text-xs mb-1 font-semibold">
+            <span class="text-pink-300"><i class="fa-solid fa-crown mr-1"></i> Slay Factor</span>
+            <span id="trait1Val" class="text-slate-300">0%</span>
+          </div>
+          <div class="w-full bg-black/60 rounded-full h-2 overflow-hidden border border-white/10">
+            <div id="trait1Bar" class="bg-neonPink h-full rounded-full transition-all duration-700 w-0"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex justify-between text-xs mb-1 font-semibold">
+            <span class="text-purple-300"><i class="fa-solid fa-wand-magic-sparkles mr-1"></i> Charisma Index</span>
+            <span id="trait2Val" class="text-slate-300">0%</span>
+          </div>
+          <div class="w-full bg-black/60 rounded-full h-2 overflow-hidden border border-white/10">
+            <div id="trait2Bar" class="bg-neonPurple h-full rounded-full transition-all duration-700 w-0"></div>
+          </div>
+        </div>
+
+        <div>
+          <div class="flex justify-between text-xs mb-1 font-semibold">
+            <span class="text-cyan-300"><i class="fa-solid fa-fire mr-1"></i> Chaos Energy</span>
+            <span id="trait3Val" class="text-slate-300">0%</span>
+          </div>
+          <div class="w-full bg-black/60 rounded-full h-2 overflow-hidden border border-white/10">
+            <div id="trait3Bar" class="bg-neonCyan h-full rounded-full transition-all duration-700 w-0"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Dismiss Action -->
+      <button onclick="closeModal()" class="w-full mt-6 py-3 rounded-xl bg-slate-800 hover:bg-slate-700 font-radar text-xs text-white tracking-wider transition-all">
+        DISMISS VERDICT
+      </button>
+
+    </div>
+  </div>
+
+  <!-- Toast Notification -->
+  <div id="toast" class="fixed bottom-6 left-1/2 -translate-x-1/2 translate-y-20 opacity-0 bg-slate-900/90 border border-neonCyan text-white px-4 py-2 rounded-full text-xs font-radar shadow-2xl transition-all duration-300 z-50 pointer-events-none flex items-center gap-2">
+    <i class="fa-solid fa-circle-check text-neonCyan"></i>
+    <span id="toastMsg">Notification</span>
+  </div>
+
+  <!-- Footer -->
+  <footer class="text-center py-4 px-4 text-[11px] text-slate-500">
+    ✨ <strong>Cyber Face Scanner:</strong> Entertainment application designed purely for party games and good vibes!
+  </footer>
+
+  <!-- Script Logic -->
+  <script>
+    let audioEnabled = false;
+    let audioCtx = null;
+    let isDetecting = false;
+    let faceDetected = false;
+    let currentDetection = null;
+
+    // Web Audio Synthesizer
+    function initAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+
+    function playBeep(freq = 880, duration = 0.1, type = 'sine') {
+      if (!audioEnabled || !audioCtx) return;
+      try {
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = type;
+        osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+        gain.gain.setValueAtTime(0.08, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+        osc.connect(gain);
+        gain.connect(audioCtx.destination);
+        osc.start();
+        osc.stop(audioCtx.currentTime + duration);
+      } catch(e){}
+    }
+
+    function toggleAudio() {
+      initAudio();
+      audioEnabled = !audioEnabled;
+      const icon = document.getElementById('audioIcon');
+      if (audioEnabled) {
+        icon.className = "fa-solid fa-volume-high text-neonCyan";
+        showToast("Audio FX Enabled");
+        playBeep(1200, 0.15);
+      } else {
+        icon.className = "fa-solid fa-volume-xmark text-neonPink";
+        showToast("Sound Muted");
+      }
+    }
+
+    // Start Camera & Load Models
+    async function startScanner() {
+      document.getElementById('startPrompt').classList.add('hidden');
+      document.getElementById('loadingBox').classList.remove('hidden');
+
+      try {
+        // Load face detection models from CDN
+        document.getElementById('loadingText').textContent = "LOADING DETECTOR MODELS...";
+        const MODEL_URL = 'https://cdn.jsdelivr.net/npm/@vladmandic/face-api/model/';
+        await faceapi.nets.tinyFaceDetector.loadFromUri(MODEL_URL);
+        await faceapi.nets.faceLandmark64TinyNet.loadFromUri(MODEL_URL);
+
+        // Access Web Camera
+        document.getElementById('loadingText').textContent = "INITIALIZING CAMERA...";
+        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user", width: 640, height: 480 } });
+        const video = document.getElementById('webcam');
+        video.srcObject = stream;
+
+        video.onloadedmetadata = () => {
+          document.getElementById('loadingBox').classList.add('hidden');
+          setStatus(true, "LOCKED & TRACKING");
+          isDetecting = true;
+          startFaceTracking();
+          
+          const scanBtn = document.getElementById('scanBtn');
+          scanBtn.disabled = false;
+          scanBtn.classList.remove('opacity-50', 'cursor-not-allowed');
+          scanBtn.classList.add('shadow-neon-pink', 'hover:scale-[1.02]');
+        };
+
+      } catch (err) {
+        alert("Camera access or model loading failed. Please allow camera permissions and refresh.");
+        document.getElementById('loadingBox').classList.add('hidden');
+        document.getElementById('startPrompt').classList.remove('hidden');
+      }
+    }
+
+    // Update status dot
+    function setStatus(active, text) {
+      const dot = document.getElementById('statusDot');
+      const label = document.getElementById('statusText');
+      label.textContent = text;
+      if (active) {
+        dot.className = "w-2.5 h-2.5 rounded-full bg-neonGreen animate-pulse";
+      } else {
+        dot.className = "w-2.5 h-2.5 rounded-full bg-slate-500";
+      }
+    }
+
+    // Face Tracking Render Loop
+    async function startFaceTracking() {
+      const video = document.getElementById('webcam');
+      const canvas = document.getElementById('overlayCanvas');
+      const displaySize = { width: video.clientWidth, height: video.clientHeight };
+      faceapi.matchDimensions(canvas, displaySize);
+
+      const options = new faceapi.TinyFaceDetectorOptions({ inputSize: 224, scoreThreshold: 0.5 });
+
+      async function renderFrame() {
+        if (!isDetecting) return;
+
+        const detections = await faceapi.detectSingleFace(video, options).withFaceLandmarks(true);
+
+        const ctx = canvas.getContext('2d');
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        if (detections) {
+          faceDetected = true;
+          currentDetection = detections;
+
+          const resizedDetections = faceapi.resizeResults(detections, displaySize);
+          const box = resizedDetections.detection.box;
+
+          // Draw Futuristic Bounding Box
+          ctx.strokeStyle = '#00f0ff';
+          ctx.lineWidth = 2;
+          ctx.strokeRect(box.x, box.y, box.width, box.height);
+
+          // Draw Corner Target Reticles
+          const cornerLen = 15;
+          ctx.strokeStyle = '#ff007f';
+          ctx.lineWidth = 4;
+
+          // Top Left Corner
+          ctx.beginPath();
+          ctx.moveTo(box.x, box.y + cornerLen);
+          ctx.lineTo(box.x, box.y);
+          ctx.lineTo(box.x + cornerLen, box.y);
+          ctx.stroke();
+
+          // Top Right Corner
+          ctx.beginPath();
+          ctx.moveTo(box.x + box.width - cornerLen, box.y);
+          ctx.lineTo(box.x + box.width, box.y);
+          ctx.lineTo(box.x + box.width, box.y + cornerLen);
+          ctx.stroke();
+
+          // Label
+          ctx.font = '11px Orbitron';
+          ctx.fillStyle = '#ff007f';
+          ctx.fillText("TARGET LOCKED", box.x, box.y - 8);
+
+        } else {
+          faceDetected = false;
+          currentDetection = null;
+        }
+
+        requestAnimationFrame(renderFrame);
+      }
+
+      renderFrame();
+    }
+
+    // Trigger Analysis Scan
+    function triggerFullScan() {
+      if (!faceDetected) {
+        showToast("No face detected! Center your face in frame.");
+        playBeep(400, 0.2, 'sawtooth');
+        return;
+      }
+
+      const laser = document.getElementById('laserLine');
+      laser.classList.remove('hidden');
+
+      playBeep(800, 0.1);
+      setTimeout(() => playBeep(1200, 0.1), 200);
+      setTimeout(() => playBeep(1600, 0.2), 400);
+
+      setTimeout(() => {
+        laser.classList.add('hidden');
+        generateVibeVerdict();
+      }, 1500);
+    }
+
+    // Generate entertainment verdict profile
+    function generateVibeVerdict() {
+      const box = currentDetection.detection.box;
+      // Derive deterministic numbers from detected face coordinates
+      const seed = Math.floor((box.x + box.y + box.width + box.height) * 100);
+
+      const score = 80 + (seed % 21); // 80 - 100%
+      const trait1 = 70 + ((seed * 3) % 31);
+      const trait2 = 65 + ((seed * 7) % 36);
+      const trait3 = 50 + ((seed * 13) % 51);
+
+      const auras = [
+        { title: "SUPREME SLAY ENERGY", color: "#ff007f", desc: "Immense glamour aura detected. Commands attention immediately upon room entry." },
+        { title: "MAIN CHARACTER VIBE", color: "#00f0ff", desc: "Camera automatically gravitates toward this face. Pure cinematic radiance." },
+        { title: "UNSTOPPABLE CHARISMA", color: "#a855f7", desc: "High charm frequency. Effortlessly elevates the energy of surrounding peers." },
+        { title: "GOLDEN HOUR GLOW", color: "#f59e0b", desc: "Warm, radiant, and incredibly photogenic aura locked in." }
+      ];
+
+      const chosenAura = auras[seed % auras.length];
+
+      // Populating Modal
+      document.getElementById('modalTitle').textContent = chosenAura.title;
+      document.getElementById('modalScore').textContent = score;
+      document.getElementById('modalCategory').textContent = chosenAura.title;
+      document.getElementById('modalCategory').style.color = chosenAura.color;
+      document.getElementById('modalDesc').textContent = `"${chosenAura.desc}"`;
+
+      document.getElementById('trait1Val').textContent = trait1 + '%';
+      document.getElementById('trait1Bar').style.width = trait1 + '%';
+
+      document.getElementById('trait2Val').textContent = trait2 + '%';
+      document.getElementById('trait2Bar').style.width = trait2 + '%';
+
+      document.getElementById('trait3Val').textContent = trait3 + '%';
+      document.getElementById('trait3Bar').style.width = trait3 + '%';
+
+      // Open Modal
+      const modal = document.getElementById('resultModal');
+      const container = document.getElementById('modalContainer');
+      modal.classList.remove('opacity-0', 'pointer-events-none');
+      container.classList.remove('scale-95');
+      container.classList.add('scale-100');
+
+      playBeep(1400, 0.25, 'sine');
+    }
+
+    function closeModal() {
+      const modal = document.getElementById('resultModal');
+      const container = document.getElementById('modalContainer');
+      modal.classList.add('opacity-0', 'pointer-events-none');
+      container.classList.remove('scale-100');
+      container.classList.add('scale-95');
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      document.getElementById('toastMsg').textContent = msg;
+      toast.classList.remove('translate-y-20', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+
+      setTimeout(() => {
+        toast.classList.remove('translate-y-0', 'opacity-100');
+        toast.classList.add('translate-y-20', 'opacity-0');
+      }, 2500);
+    }
+  </script>
+</body>
+</html>
